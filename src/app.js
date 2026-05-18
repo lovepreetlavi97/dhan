@@ -30,6 +30,26 @@ const bootServer = async () => {
       logger.warn('DhanHQ credentials missing. Live Feed unavailable.');
     }
 
+    // Schedule 6:00 AM IST Daily System Check
+    setInterval(async () => {
+      const now = new Date();
+      
+      // Runs at exactly 6:00 AM IST or 12:28 AM IST
+      const is6AM = now.getHours() === 6 && now.getMinutes() === 0;
+      const is1228AM = now.getHours() === 0 && now.getMinutes() === 28;
+
+      if (is6AM || is1228AM) {
+        try {
+          const { sendAlert } = require('./telegram/bot');
+          const timeStr = now.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata' });
+          await sendAlert(`🌅 <b>System Heartbeat</b>\n\nGood morning! Dhan Scalper Pro is currently online and fully stable on the AWS server.\n\nServer Time: ${timeStr}\n\nStanding by for Market Open!`);
+          logger.info(`Dispatched Status Alert at ${timeStr}`);
+        } catch (err) {
+          logger.error('Failed to send daily alert: ' + err.message);
+        }
+      }
+    }, 60000); // Check every 60 seconds
+
     app.listen(config.port, () => {
       logger.info(`REST API running on port ${config.port}`);
     });
