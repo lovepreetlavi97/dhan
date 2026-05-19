@@ -17,6 +17,8 @@ const bootServer = async () => {
   try {
     logger.info('Initializing Dhan Scalping Engine (Lightweight)...');
 
+    const { startOptionChainSync } = require('./optionchain');
+
     // Start Telegram bot
     if (config.telegram.botToken) {
       bot.launch();
@@ -26,6 +28,7 @@ const bootServer = async () => {
     // Connect to Live Market Feed
     if (config.dhan.clientId && config.dhan.accessToken) {
       initWebSocket();
+      startOptionChainSync();
     } else {
       logger.warn('DhanHQ credentials missing. Live Feed unavailable.');
     }
@@ -50,9 +53,23 @@ const bootServer = async () => {
       }
     }, 60000); // Check every 60 seconds
 
-    app.listen(config.port, () => {
+    const server = app.listen(config.port, () => {
       logger.info(`REST API running on port ${config.port}`);
     });
+
+    // Graceful Shutdown
+    const shutdown = () => {
+      logger.info('Shutting down gracefully...');
+      if (config.telegram.botToken) bot.stop('SIGINT');
+      server.close(() => {
+        logger.info('HTTP server closed.');
+        process.exit(0);
+      });
+    };
+
+    process.once('SIGINT', shutdown);
+    process.once('SIGTERM', shutdown);
+    process.once('SIGUSR2', shutdown); // specifically for nodemon restarts
   } catch (err) {
     logger.error(`Boot failure: ${err.message}`);
     process.exit(1);
@@ -60,13 +77,3 @@ const bootServer = async () => {
 };
 
 bootServer();
-
-// Graceful Shutdown
-process.once('SIGINT', () => {
-  if (config.telegram.botToken) bot.stop('SIGINT');
-  process.exit(0);
-});
-process.once('SIGTERM', () => {
-  if (config.telegram.botToken) bot.stop('SIGTERM');
-  process.exit(0);
-});
